@@ -5,13 +5,13 @@ import (
 	"log"
 	"net/http"
 
-	ad "../image-builder-webhook/admissioncontrol"
+	"imgbuilder/v1/admissioncontrol"
 )
 
 func main() {
 
 	http.HandleFunc("/", ExampleHandler)
-	http.HandleFunc("/mutate", ad.WebhookMutator)
+	http.HandleFunc("/mutate", admissioncontrol.WebhookMutator)
 	log.Println("** Service Started on Port 3000 **")
 
 	// Use ListenAndServeTLS() instead of ListenAndServe() which accepts two extra parameters.

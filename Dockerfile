@@ -8,10 +8,7 @@ COPY  . .
 RUN go get .
 RUN CGO_ENABLED=0 GOOS=linux go build  -ldflags '-extldflags "-static"' -o imgBuilder
 
-FROM gcr.io/distroless/static:nonroot
-
-
-
+#FROM gcr.io/distroless/static:nonroot
 FROM scratch
 WORKDIR /
 COPY --from=build-env /go/src/github.com/webhook .
