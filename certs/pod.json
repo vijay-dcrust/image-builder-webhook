@@ -2,8 +2,11 @@
     "apiVersion": "v1",
     "kind": "Pod",
     "metadata": {
+        "labels": {
+            "cross-platform-build": "enabled"
+        },
         "name": "kaniko",
-        "namespace": "default"
+        "namespace": "test-arm-image"
     },
     "spec": {
         "containers": [
@@ -18,7 +21,7 @@
                         "value": "sgcentral"
                     }
                 ],
-                "image": "vijaydcrust/kaniko-latest",
+                "image": "gcr.io/kaniko-project/executor:v1.3.0",
                 "name": "kaniko",
                 "volumeMounts": [
                     {

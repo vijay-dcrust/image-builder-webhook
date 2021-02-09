@@ -1,23 +1,54 @@
 {
-    "kind": "Pod",
     "apiVersion": "v1",
+    "kind": "Pod",
     "metadata": {
-        "name": "pod",
-        "creationTimestamp": null,
-        "labels": {
-            "run": "pod"
-        }
+        "name": "kaniko",
+        "namespace": "default"
     },
     "spec": {
         "containers": [
             {
-                "name": "pod",
-                "image": "nginx",
-                "resources": {}
+                "args": [
+                    "--context=git://github.com/vijay-dcrust/simple-webhook.git",
+                    "--destination=851255665500.dkr.ecr.ap-southeast-1.amazonaws.com/db-central-repo:simple-webhook"
+                ],
+                "env": [
+                    {
+                        "name": "AWS_PROFILE",
+                        "value": "sgcentral"
+                    }
+                ],
+                "image": "vijaydcrust/kaniko-latest",
+                "name": "kaniko",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/root/.docker/",
+                        "name": "docker-config"
+                    },
+                    {
+                        "mountPath": "/root/.aws/",
+                        "name": "aws-secret"
+                    }
+                ]
             }
         ],
-        "restartPolicy": "Always",
-        "dnsPolicy": "ClusterFirst"
-    },
-    "status": {}
+        "nodeSelector": {
+            "beta.kubernetes.io/arch": "amd64"
+        },
+        "restartPolicy": "Never",
+        "volumes": [
+            {
+                "configMap": {
+                    "name": "docker-config"
+                },
+                "name": "docker-config"
+            },
+            {
+                "name": "aws-secret",
+                "secret": {
+                    "secretName": "aws-secret"
+                }
+            }
+        ]
+    }
 }
