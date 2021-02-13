@@ -5,7 +5,7 @@ WORKDIR /go/src/github.com/webhook
 COPY  . .
 #RUN adduser -u 10001 webhook --disabled-password --gecos ""
 #RUN useradd -u 10001 webhook
-RUN go get .
+#RUN go get .
 RUN CGO_ENABLED=0 GOOS=linux go build  -ldflags '-extldflags "-static"' -o imgBuilder
 
 #FROM gcr.io/distroless/static:nonroot

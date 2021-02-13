@@ -9,6 +9,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 
@@ -16,6 +17,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
@@ -42,19 +44,8 @@ var (
 // WebhookMutator  function to handle the admission review
 func WebhookMutator(w http.ResponseWriter, r *http.Request) {
 	var body []byte
-	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
-	flag.Parse()
-
-	// use the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		panic(err.Error())
-	}
+	mode := os.Getenv("MODE")
+	config := GetKubeConfig(mode)
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
@@ -78,20 +69,22 @@ func WebhookMutator(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//arRequest := v1beta1.AdmissionReview{}
 	arRequest := v1beta1.AdmissionReview{}
+
 	if err := json.Unmarshal(body, &arRequest); err != nil {
 		http.Error(w, "incorrect body", http.StatusBadRequest)
 	}
-	//raw := arRequest.Request.Object.Raw
+	raw := arRequest.Request.Object.Raw
 	pod := v1.Pod{}
-	if err := json.Unmarshal(body, &pod); err != nil {
+	if err := json.Unmarshal(raw, &pod); err != nil {
 		log.Println("error deserializing pod")
 		return
 	}
 	if pod.Labels["cross-platform-build"] != "enabled" {
 		msg = "No action required for pod" + pod.Name
 	} else {
-		dupPod := CopyPod(&pod)
+		dupPod := CopyPod(pod)
 		if dupPod == nil {
 			msg = "No supported orig image found. " + pod.Name
 		} else {
@@ -130,7 +123,7 @@ func WebhookMutator(w http.ResponseWriter, r *http.Request) {
 }
 
 // CopyPod builds the cross platform Pod from existing Pod
-func CopyPod(orig *v1.Pod) *v1.Pod {
+func CopyPod(orig v1.Pod) *v1.Pod {
 	var dupPodImage string
 	var dupArgs []string
 	var dupNodeSelector map[string]string
@@ -182,4 +175,34 @@ func UpdateDestinationArgs(orig []string, imgTag string) []string {
 		dupArgs[i] = orig[i]
 	}
 	return dupArgs
+}
+
+//GetKubeConfig Get the kubernetes config
+func GetKubeConfig(mode string) *rest.Config {
+	type config *rest.Config
+	//Outside k8s Cluster authentication
+	if mode == "DEV" {
+		var kubeconfig *string
+		if home := homedir.HomeDir(); home != "" {
+			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+		} else {
+			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		}
+		flag.Parse()
+		// use the current context in kubeconfig
+		config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		if err != nil {
+			panic(err.Error())
+		}
+		return config
+
+	} else {
+		//creates the in-cluster config
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			panic(err.Error())
+		}
+		return config
+	}
+
 }

@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-
 	http.HandleFunc("/", ExampleHandler)
 	http.HandleFunc("/mutate", admissioncontrol.WebhookMutator)
 	log.Println("** Service Started on Port 3000 **")
