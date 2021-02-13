@@ -3,7 +3,6 @@ package admissioncontrol
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -45,8 +44,7 @@ var (
 func WebhookMutator(w http.ResponseWriter, r *http.Request) {
 	var body []byte
 	mode := os.Getenv("MODE")
-	config := GetKubeConfig(mode)
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(GetKubeConfig(mode))
 	if err != nil {
 		panic(err.Error())
 	}
@@ -68,18 +66,24 @@ func WebhookMutator(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no mutate", http.StatusBadRequest)
 		return
 	}
-
-	//arRequest := v1beta1.AdmissionReview{}
-	arRequest := v1beta1.AdmissionReview{}
-
-	if err := json.Unmarshal(body, &arRequest); err != nil {
-		http.Error(w, "incorrect body", http.StatusBadRequest)
-	}
-	raw := arRequest.Request.Object.Raw
 	pod := v1.Pod{}
-	if err := json.Unmarshal(raw, &pod); err != nil {
-		log.Println("error deserializing pod")
-		return
+	if mode == "DEV" {
+		//Code for testing the pod config on local setup
+		if err := json.Unmarshal(body, &pod); err != nil {
+			log.Println("error deserializing pod")
+			return
+		}
+	} else {
+		// Code for InCluster config on k8s cluster
+		arRequest := v1beta1.AdmissionReview{}
+		if err := json.Unmarshal(body, &arRequest); err != nil {
+			http.Error(w, "incorrect body", http.StatusBadRequest)
+		}
+		raw := arRequest.Request.Object.Raw
+		if err := json.Unmarshal(raw, &pod); err != nil {
+			log.Println("error deserializing pod")
+			return
+		}
 	}
 	if pod.Labels["cross-platform-build"] != "enabled" {
 		msg = "No action required for pod" + pod.Name
@@ -179,30 +183,25 @@ func UpdateDestinationArgs(orig []string, imgTag string) []string {
 
 //GetKubeConfig Get the kubernetes config
 func GetKubeConfig(mode string) *rest.Config {
-	type config *rest.Config
-	//Outside k8s Cluster authentication
+	config := &rest.Config{}
 	if mode == "DEV" {
-		var kubeconfig *string
+		//Outside k8s Cluster authentication
+		var kubeconfig string
 		if home := homedir.HomeDir(); home != "" {
-			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+			//kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+			kubeconfig = filepath.Join(home, ".kube", "config")
 		} else {
-			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+			//kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+			kubeconfig = ""
 		}
-		flag.Parse()
+		//flag.Parse()
 		// use the current context in kubeconfig
-		config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-		if err != nil {
-			panic(err.Error())
-		}
-		return config
-
+		config, _ = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		//if err != nil {
+		//	panic(err.Error())
+		//}
 	} else {
-		//creates the in-cluster config
-		config, err := rest.InClusterConfig()
-		if err != nil {
-			panic(err.Error())
-		}
-		return config
+		config, _ = rest.InClusterConfig()
 	}
-
+	return config
 }
