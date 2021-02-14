@@ -46,6 +46,7 @@ func WebhookMutator(w http.ResponseWriter, r *http.Request) {
 	mode := os.Getenv("MODE")
 	clientset, err := kubernetes.NewForConfig(GetKubeConfig(mode))
 	if err != nil {
+		log.Println("error creating the clientset from kubeconfig")
 		panic(err.Error())
 	}
 	var msg string
@@ -86,14 +87,14 @@ func WebhookMutator(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if pod.Labels["cross-platform-build"] != "enabled" {
-		msg = "No action required for pod" + pod.Name
+		msg = "No action required for pod :" + pod.Name
 	} else {
 		dupPod := CopyPod(pod)
 		if dupPod == nil {
 			msg = "No supported orig image found. " + pod.Name
 		} else {
-			log.Println(pod.Spec.Containers[0].Args[0])
-			log.Println(pod.Spec.Containers[0].Args[1])
+			//log.Println(dupPod.Spec.Containers[0].Args[0])
+			//log.Println(dupPod.Spec.Containers[0].Args[1])
 			log.Println(dupPod.Spec.Tolerations)
 			_, err := clientset.CoreV1().Pods(pod.Namespace).Create(context.TODO(), dupPod, metav1.CreateOptions{})
 			if err != nil {
@@ -175,8 +176,8 @@ func UpdateDestinationArgs(orig []string, imgTag string) []string {
 		match, _ := regexp.MatchString(`^--destination=`, s)
 		if match == true {
 			dupArgs[i] = orig[i] + imgTag
+			break
 		}
-		dupArgs[i] = orig[i]
 	}
 	return dupArgs
 }
